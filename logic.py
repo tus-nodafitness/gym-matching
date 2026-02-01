@@ -54,9 +54,17 @@ def save_data(data_list):
         # データを1行ずつ保存
         if data_list:
             for d in data_list:
+                raw_pass = str(d.get("password", ""))
+                # もしパスワードが数字だけで構成されていたら、先頭に ' をつけて強制的に文字にする
+                # (例: "01" -> "'01")
+                if raw_pass.isdigit():
+                    save_pass = "'" + raw_pass
+                else:
+                    save_pass = raw_pass
+
                 row = [
                     d.get("name", ""),
-                    d.get("password", ""),
+                    save_pass,  # 対策済みのパスワードを保存
                     d.get("level", ""),
                     ",".join(d.get("gyms", [])) if isinstance(d.get("gyms"), list) else d.get("gyms", ""),
                     ",".join(d.get("schedule", [])) if isinstance(d.get("schedule"), list) else d.get("schedule", ""),
@@ -64,7 +72,7 @@ def save_data(data_list):
                     d.get("score", 0)
                 ]
                 sheet.append_row(row)
-                time.sleep(0.1) # サーバー負荷軽減のため少しだけ待つ
+                time.sleep(0.1)
             
         return True
         
@@ -112,6 +120,7 @@ def find_matches(current_user, all_users):
     
     results.sort(key=lambda x: x["score"], reverse=True)
     return results
+
 
 
 
