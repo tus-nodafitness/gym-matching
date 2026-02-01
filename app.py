@@ -185,7 +185,6 @@ def main():
                             st.write(f"⏰ 合う時間: {', '.join(common_days_display)}")
                         with c2:
                             st.metric("マッチ度", f"{m['score']}点")
-                            st.button("連絡する", key=f"btn_{m['name']}")
             else:
                 st.warning("条件が一致する相手は見つかりませんでした。")
     else:
@@ -193,6 +192,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
