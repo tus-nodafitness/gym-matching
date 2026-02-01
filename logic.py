@@ -7,6 +7,7 @@ Created on Mon Jan 26 08:50:16 2026
 import streamlit as st
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
+import time
 
 # --- 1. 定数データの定義 ---
 GYM_OPTIONS = ["エニタイム", "ゴールドジム", "トレーニングルーム"]
@@ -17,22 +18,17 @@ TIMES = [
     "14:00-16:00", "16:00-18:00", "18:00-20:00", "20:00-22:00"
 ]
 
-# スプレッドシートの名前
 SHEET_NAME = "筋トレマッチングDB"
 
-# --- 2. スプレッドシート接続機能 ---
+# --- 2. 接続機能 ---
 def get_sheet():
-    # Secretsから認証情報を取得
     creds_dict = dict(st.secrets["gcp_service_account"])
-    
-    # スコープ設定（最新版）
     scope = [
         'https://www.googleapis.com/auth/spreadsheets',
         'https://www.googleapis.com/auth/drive'
     ]
     creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
     client = gspread.authorize(creds)
-    
     return client.open(SHEET_NAME).sheet1
 
 # --- 3. データ読み込み ---
@@ -43,38 +39,40 @@ def load_data():
     except Exception:
         return []
 
-# --- 4. データ保存（修正版） ---
+# --- 4. データ保存（ここを「1行ずつ保存」に変更！）---
 def save_data(data_list):
     try:
         sheet = get_sheet()
-        sheet.clear() # 一旦クリア
         
-        # ヘッダー作成
+        # シートをクリア
+        sheet.clear()
+        
+        # ヘッダーを保存
         header = ["name", "password", "level", "gyms", "schedule", "comment", "score"]
-        all_rows = [header]
+        sheet.append_row(header)
         
-        # データ作成
-        for d in data_list:
-            row = [
-                d.get("name", ""),
-                d.get("password", ""),
-                d.get("level", ""),
-                # リスト型を文字列に変換
-                ",".join(d.get("gyms", [])) if isinstance(d.get("gyms"), list) else d.get("gyms", ""),
-                ",".join(d.get("schedule", [])) if isinstance(d.get("schedule"), list) else d.get("schedule", ""),
-                d.get("comment", ""),
-                d.get("score", 0)
-            ]
-            all_rows.append(row)
+        # データを1行ずつ保存（これが一番確実です）
+        if data_list:
+            for d in data_list:
+                row = [
+                    d.get("name", ""),
+                    d.get("password", ""),
+                    d.get("level", ""),
+                    ",".join(d.get("gyms", [])) if isinstance(d.get("gyms"), list) else d.get("gyms", ""),
+                    ",".join(d.get("schedule", [])) if isinstance(d.get("schedule"), list) else d.get("schedule", ""),
+                    d.get("comment", ""),
+                    d.get("score", 0)
+                ]
+                sheet.append_row(row)
+                time.sleep(0.1) # サーバー負荷軽減のため少しだけ待つ
             
-        sheet.append_rows(all_rows)
         return True
         
     except Exception as e:
-        st.error(f"保存に失敗しました: {e}")
+        st.error(f"保存エラー詳細: {e}")
         return False
 
-# --- 5. マッチング機能（ここも必要です！） ---
+# --- 5. マッチング機能 ---
 def find_matches(current_user, all_users):
     results = []
     
