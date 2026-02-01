@@ -4,19 +4,28 @@ Created on Mon Jan 26 08:50:16 2026
 
 @author: keiji
 """
-
 import streamlit as st
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 
-# --- 定数 ---
+# --- 1. 定数データの定義 ---
+GYM_OPTIONS = ["エニタイム", "ゴールドジム", "トレーニングルーム"]
+LEVEL_OPTIONS = ["初心者", "上級者"]
+DAYS = ["月", "火", "水", "木", "金"]
+TIMES = [
+    "08:00-10:00", "10:00-12:00", "12:00-14:00", 
+    "14:00-16:00", "16:00-18:00", "18:00-20:00", "20:00-22:00"
+]
+
+# スプレッドシートの名前
 SHEET_NAME = "筋トレマッチングDB"
 
+# --- 2. スプレッドシート接続機能 ---
 def get_sheet():
     # Secretsから認証情報を取得
     creds_dict = dict(st.secrets["gcp_service_account"])
     
-    # 【修正点】スコープを最新のGoogle API形式に変更
+    # スコープ設定（最新版）
     scope = [
         'https://www.googleapis.com/auth/spreadsheets',
         'https://www.googleapis.com/auth/drive'
@@ -26,6 +35,7 @@ def get_sheet():
     
     return client.open(SHEET_NAME).sheet1
 
+# --- 3. データ読み込み ---
 def load_data():
     try:
         sheet = get_sheet()
@@ -33,15 +43,17 @@ def load_data():
     except Exception:
         return []
 
+# --- 4. データ保存（修正版） ---
 def save_data(data_list):
     try:
         sheet = get_sheet()
         sheet.clear() # 一旦クリア
         
-        # ヘッダーとデータを作成
+        # ヘッダー作成
         header = ["name", "password", "level", "gyms", "schedule", "comment", "score"]
         all_rows = [header]
         
+        # データ作成
         for d in data_list:
             row = [
                 d.get("name", ""),
@@ -56,9 +68,49 @@ def save_data(data_list):
             all_rows.append(row)
             
         sheet.append_rows(all_rows)
-        return True  # 成功したらTrueを返す
+        return True
         
     except Exception as e:
-        # エラーの詳細を表示
         st.error(f"保存に失敗しました: {e}")
-        return False # 失敗したらFalseを返す
+        return False
+
+# --- 5. マッチング機能（ここも必要です！） ---
+def find_matches(current_user, all_users):
+    results = []
+    
+    def ensure_list(val):
+        if isinstance(val, str):
+            if val == "": return []
+            return val.split(",")
+        return val
+
+    my_gyms = set(ensure_list(current_user["gyms"]))
+    my_schedule = set(ensure_list(current_user["schedule"]))
+    my_level = current_user["level"]
+
+    for other in all_users:
+        if other["name"] == current_user["name"]:
+            continue
+            
+        other_gyms = set(ensure_list(other["gyms"]))
+        other_schedule = set(ensure_list(other["schedule"]))
+        other_level = other["level"]
+        
+        common_gyms = my_gyms & other_gyms
+        common_schedule = my_schedule & other_schedule
+        is_same_level = (my_level == other_level)
+
+        if len(common_gyms) > 0 and len(common_schedule) > 0:
+            score = (len(common_schedule) * 10) + (20 if is_same_level else 0)
+            
+            results.append({
+                "name": other["name"],
+                "level": other["level"],
+                "common_gyms": list(common_gyms),
+                "common_schedule": list(common_schedule),
+                "score": score,
+                "comment": other.get("comment", "")
+            })
+    
+    results.sort(key=lambda x: x["score"], reverse=True)
+    return results
