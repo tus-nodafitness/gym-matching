@@ -53,8 +53,13 @@ def main():
                     user_data = next((u for u in all_users if u["name"] == input_name), None)
                     
                     if user_data:
+                        db_pass = str(user_data.get("password"))
+                        
+                        # もし先頭にアポストロフィ(')がついていたら、取り除く
+                        if db_pass.startswith("'"):
+                            db_pass = db_pass[1:]
                         # パスワードは数値や文字が混ざる可能性があるため、文字列として比較
-                        if str(user_data.get("password")) == str(input_pass):
+                        if db_pass == str(input_pass):
                             st.success("ログイン成功！")
                             st.session_state["is_logged_in"] = True
                             st.session_state["user_name"] = input_name
@@ -188,6 +193,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
