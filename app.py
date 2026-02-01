@@ -49,9 +49,8 @@ def main():
                     st.warning("名前とパスワードを入力してください")
                 else:
                     # ユーザー確認
-                    all_users = logic.load_data()
+                    all_users = logic.load_data(dtype=str)
                     user_data = next((u for u in all_users if u["name"] == input_name), None)
-                    st.info(user_data)
                     
                     if user_data:
                         # パスワードは数値や文字が混ざる可能性があるため、文字列として比較
@@ -189,4 +188,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
