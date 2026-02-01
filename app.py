@@ -19,12 +19,13 @@ TIMES = logic.TIMES
 
 def main():
     st.title("💪 合トレ マッチングシステム")
-
-    try:
-        bot_email = st.secrets["gcp_service_account"]["client_email"]
-        st.sidebar.info(f"システムID: {bot_email}")
-    except:
-        pass
+    
+    # 接続確認用（もしボットIDが見たければコメントアウトを外す）
+    # try:
+    #     bot_email = st.secrets["gcp_service_account"]["client_email"]
+    #     st.sidebar.info(f"ID: {bot_email}")
+    # except:
+    #     pass
 
     # --- セッション状態（ログイン状態）の管理 ---
     if "is_logged_in" not in st.session_state:
@@ -38,7 +39,6 @@ def main():
     if not st.session_state["is_logged_in"]:
         st.sidebar.header("ログイン")
         
-        # フォーム機能を使う（ボタンを押すまで送信されない）
         with st.sidebar.form("login_form"):
             input_name = st.text_input("名前を入力")
             input_pass = st.text_input("パスワード", type="password")
@@ -50,28 +50,25 @@ def main():
                 else:
                     # ユーザー確認
                     all_users = logic.load_data()
-                    # 名前で検索
                     user_data = next((u for u in all_users if u["name"] == input_name), None)
                     
                     if user_data:
-                        # 登録済みユーザー：パスワードチェック
-                        if user_data.get("password") == input_pass:
+                        # パスワードは数値や文字が混ざる可能性があるため、文字列として比較
+                        if str(user_data.get("password")) == str(input_pass):
                             st.success("ログイン成功！")
                             st.session_state["is_logged_in"] = True
                             st.session_state["user_name"] = input_name
                             st.session_state["password"] = input_pass
-                            st.rerun() # 画面リロードしてメイン画面へ
+                            st.rerun()
                         else:
                             st.error("パスワードが違います ❌")
                     else:
-                        # 新規ユーザー：このパスワードで進める
                         st.info(f"ようこそ！{input_name}さんは新規登録として進めます。")
                         st.session_state["is_logged_in"] = True
                         st.session_state["user_name"] = input_name
                         st.session_state["password"] = input_pass
                         st.rerun()
         
-        # ログインしていない時はここで終了
         st.info("👈 左のサイドバーからログインしてください")
         return
 
@@ -81,7 +78,6 @@ def main():
     user_name = st.session_state["user_name"]
     current_pass = st.session_state["password"]
 
-    # サイドバーにユーザー情報とログアウトボタン
     st.sidebar.markdown(f"**ログイン中:** {user_name}")
     if st.sidebar.button("ログアウト"):
         st.session_state["is_logged_in"] = False
@@ -93,10 +89,28 @@ def main():
     all_users = logic.load_data()
     current_user_data = next((u for u in all_users if u["name"] == user_name), None)
 
+    # --- 【重要】文字列をリストに戻すための関数 ---
+    def str_to_list(val):
+        if isinstance(val, str):
+            if val == "": return []
+            return val.split(",")
+        # すでにリストならそのまま返す
+        if isinstance(val, list):
+            return val
+        return []
+
     # 初期値の設定
     default_level = current_user_data["level"] if current_user_data else LEVEL_OPTIONS[0]
-    default_gyms = current_user_data["gyms"] if current_user_data else []
-    default_schedule = current_user_data["schedule"] if current_user_data else []
+    
+    # ここで変換関数を使う！これでエラーが消えます
+    raw_gyms = current_user_data["gyms"] if current_user_data else []
+    default_gyms = str_to_list(raw_gyms)
+    # 安全のため、選択肢に存在するものだけを残すフィルタリング
+    default_gyms = [g for g in default_gyms if g in GYM_OPTIONS]
+
+    raw_schedule = current_user_data["schedule"] if current_user_data else []
+    default_schedule = str_to_list(raw_schedule)
+
     default_comment = current_user_data.get("comment", "") if current_user_data else ""
 
     # --- プロフィール入力フォーム ---
@@ -106,7 +120,7 @@ def main():
         col1, col2 = st.columns([1, 2])
         
         with col1:
-            level = st.radio("レベル", LEVEL_OPTIONS, index=LEVEL_OPTIONS.index(default_level))
+            level = st.radio("レベル", LEVEL_OPTIONS, index=LEVEL_OPTIONS.index(default_level) if default_level in LEVEL_OPTIONS else 0)
             gyms = st.multiselect("利用ジム", GYM_OPTIONS, default=default_gyms)
             comment = st.text_area("ひとこと", default_comment)
 
@@ -127,26 +141,26 @@ def main():
         if st.button("設定を保存する", type="primary"):
             new_user_data = {
                 "name": user_name,
-                "password": current_pass, # ログイン時のパスワードを保存
+                "password": current_pass,
                 "level": level,
                 "gyms": gyms,
                 "schedule": selected_schedule,
                 "comment": comment
             }
             
+            # 更新処理
             updated_users = [u for u in all_users if u["name"] != user_name]
             updated_users.append(new_user_data)
             
-            logic.save_data(updated_users)
-            st.success("保存しました！")
-            st.rerun()
+            if logic.save_data(updated_users):
+                st.success("保存しました！")
+                st.rerun()
 
     # --- マッチング結果 ---
     st.markdown("---")
     st.subheader("🔍 マッチング結果")
 
     today_weekday = datetime.datetime.now().weekday()
-    # 開発モード（Trueならいつでも見れる、Falseなら土日のみ）
     DEV_MODE = True 
 
     if today_weekday >= 5 or DEV_MODE:
@@ -173,5 +187,4 @@ def main():
         st.info("🚧 現在は「登録期間」です。土日に結果が公開されます。")
 
 if __name__ == "__main__":
-
     main()
