@@ -20,6 +20,12 @@ TIMES = logic.TIMES
 def main():
     st.title("💪 合トレ マッチングシステム")
 
+    try:
+        bot_email = st.secrets["gcp_service_account"]["client_email"]
+        st.sidebar.info(f"システムID: {bot_email}")
+    except:
+        pass
+
     # --- セッション状態（ログイン状態）の管理 ---
     if "is_logged_in" not in st.session_state:
         st.session_state["is_logged_in"] = False
@@ -167,4 +173,5 @@ def main():
         st.info("🚧 現在は「登録期間」です。土日に結果が公開されます。")
 
 if __name__ == "__main__":
+
     main()
