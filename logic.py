@@ -18,21 +18,20 @@ TIMES = [
     "14:00-16:00", "16:00-18:00", "18:00-20:00", "20:00-22:00"
 ]
 
-# スプレッドシートの名前（先ほど付けた名前と一字一句同じにしてください）
+# スプレッドシートの名前
 SHEET_NAME = "筋トレマッチングDB"
 
 def get_sheet():
     """スプレッドシートに接続する関数"""
-    # 1. 認証情報をSecretsから取得
-    # (Streamlit Cloudの機能を使って安全に鍵を取り出します)
+    # Secretsから認証情報を取得
     creds_dict = dict(st.secrets["gcp_service_account"])
     
-    # 2. 認証設定
+    # 認証設定
     scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
     creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
     client = gspread.authorize(creds)
     
-    # 3. シートを開く
+    # シートを開く
     sheet = client.open(SHEET_NAME).sheet1
     return sheet
 
@@ -40,53 +39,47 @@ def get_sheet():
 def load_data():
     try:
         sheet = get_sheet()
-        # 全データを辞書形式で取得
         data = sheet.get_all_records()
         return data
     except Exception as e:
-        # エラー時はログに出して空リストを返す
-        print(f"読み込みエラー: {e}")
+        # シートが空っぽの場合などのエラー対策
         return []
 
-# --- 2. データの保存 ---
+# --- 2. データの保存（ここを修正！）---
 def save_data(data_list):
     try:
         sheet = get_sheet()
         
-        # データが空の場合の処理
-        if not data_list:
-            sheet.clear()
-            sheet.append_row(["name", "password", "level", "gyms", "schedule", "comment", "score"])
-            return
-
-        # 1行目（ヘッダー）を作る
-        headers = list(data_list[0].keys())
-        
-        # 中身（データ）を作る
-        # ※辞書の値(values)だけを取り出してリストにする
-        # ※gymsやscheduleなどのリスト型は文字列に変換して保存する工夫が必要ですが、
-        #   gspreadは自動で文字列化してくれることが多いです。
-        #   厳密にやるなら json.dumps 等を使いますが、簡易版としてそのまま渡します。
-        rows = []
-        for d in data_list:
-            row_data = []
-            for key in headers:
-                val = d.get(key, "")
-                # リスト型（ジムやスケジュール）はカンマ区切り文字列に変換して保存すると安全
-                if isinstance(val, list):
-                    val = ",".join(val)
-                row_data.append(val)
-            rows.append(row_data)
-
-        # シートをクリアして書き込み直す
+        # 一旦シートを真っ白にする（これが一番安全）
         sheet.clear()
-        sheet.append_row(headers)
-        sheet.update(f"A2", rows) # A2から一気に書き込み
+        
+        # 保存用のヘッダーを作る
+        header = ["name", "password", "level", "gyms", "schedule", "comment", "score"]
+        
+        # 保存する全データを作成（ヘッダー + 中身）
+        all_rows = [header]
+        
+        if data_list:
+            for d in data_list:
+                row_data = [
+                    d.get("name", ""),
+                    d.get("password", ""),
+                    d.get("level", ""),
+                    # リスト型は文字列に変換
+                    ",".join(d.get("gyms", [])) if isinstance(d.get("gyms"), list) else d.get("gyms", ""),
+                    ",".join(d.get("schedule", [])) if isinstance(d.get("schedule"), list) else d.get("schedule", ""),
+                    d.get("comment", ""),
+                    d.get("score", 0)
+                ]
+                all_rows.append(row_data)
+
+        # 一気に書き込む（append_rowsはどのバージョンでも動作安定）
+        sheet.append_rows(all_rows)
         
     except Exception as e:
         st.error(f"保存エラー: {e}")
 
-# --- 3. マッチング計算ロジック（読み込み時に文字列→リスト変換を追加） ---
+# --- 3. マッチング計算ロジック ---
 def find_matches(current_user, all_users):
     results = []
     
