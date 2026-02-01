@@ -51,7 +51,7 @@ def save_data(data_list):
         header = ["name", "password", "level", "gyms", "schedule", "comment", "score"]
         sheet.append_row(header)
         
-        # データを1行ずつ保存（これが一番確実です）
+        # データを1行ずつ保存
         if data_list:
             for d in data_list:
                 row = [
@@ -112,5 +112,6 @@ def find_matches(current_user, all_users):
     
     results.sort(key=lambda x: x["score"], reverse=True)
     return results
+
 
 
