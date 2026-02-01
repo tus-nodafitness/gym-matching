@@ -29,7 +29,7 @@ def get_sheet():
     ]
     creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
     client = gspread.authorize(creds)
-    return client.open(SHEET_NAME).matchingDB
+    return client.open(SHEET_NAME).sheet1
 
 # --- 3. データ読み込み ---
 def load_data():
@@ -112,4 +112,5 @@ def find_matches(current_user, all_users):
     
     results.sort(key=lambda x: x["score"], reverse=True)
     return results
+
 
